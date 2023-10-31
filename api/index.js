@@ -10,6 +10,7 @@ const cookieParser = require("cookie-parser");
 const multer = require("multer");
 const uploadMiddleware = multer({ dest: "uploads/" });
 const fs = require("fs");
+require("dotenv").config();
 
 const salt = bcrypt.genSaltSync(10);
 const secret = "sjekof843utjre";
@@ -19,9 +20,7 @@ app.use(express.json());
 app.use(cookieParser());
 app.use("/uploads", express.static(__dirname + "/uploads"));
 
-mongoose.connect(
-  `mongodb+srv://vpalatnyk:uVo91pGqwkv438FY@cluster0.lcaly6w.mongodb.net/?retryWrites=true&w=majority`
-);
+mongoose.connect(process.env.DB_CONNECTION_STRING);
 
 // Code below: registers a user and write to the database encrypting users password)
 
@@ -44,9 +43,13 @@ app.post("/register", async (req, res) => {
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
   const userDoc = await User.findOne({ username });
-  const passOk = bcrypt.compareSync(password, userDoc.password);
+  // const passOk = bcrypt.compareSync(password, userDoc.password);
 
-  if (passOk) {
+  if (!userDoc) {
+    return res.status(400).json("User not found.");
+  }
+
+  if (userDoc && bcrypt.compareSync(password, userDoc.password)) {
     jwt.sign({ username, id: userDoc._id }, secret, {}, (err, token) => {
       if (err) throw err;
       res.cookie("token", token).json({ id: userDoc._id, username });
@@ -117,7 +120,7 @@ app.put("/post", uploadMiddleware.single("file"), async (req, res) => {
         );
     }
 
-    await postDoc.update({
+    await postDoc.updateOne({
       title,
       summary,
       content,
